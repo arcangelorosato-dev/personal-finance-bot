@@ -14,17 +14,111 @@ supabase: Client = create_client(url, key)
 
 # --- FUNZIONI DI RECUPERO DATI ---
 
-def get_monthly_report_data(user_id: int):
-    """Recupera tutte le transazioni del mese corrente per il report."""
-    start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0).isoformat()
-    
-    response = supabase.table("transactions") \
-        .select("amount, category, merchant, created_at") \
+def get_existing_categories():
+    # recupera tutte le categorie uniche già presenti nel tuo db
+    response = supabase.table("transactions").select("category").execute()
+    # crea una lista senza duplicati
+    categories = list(set([row['category'] for row in response.data]))
+    return categories
+
+def update_user_budget(user_id: int, budget: float):
+    """aggiorna il budget mensile nella tabella corretta."""
+    return supabase.table("users_settings") \
+        .update({"budget_monthly": budget}) \
         .eq("user_id", user_id) \
-        .gte("created_at", start_of_month) \
+        .execute()
+
+def add_transaction_from_ocr(user_id, amount, category, description, date):
+    # normalizzazione forzata
+    category_clean = category.lower().strip()
+    description_clean = description.lower().strip()
+    
+    return supabase.table("transactions").insert({
+        "user_id": user_id,
+        "amount": amount,
+        "category": category_clean,
+        "description": description_clean,
+        "date": date
+    }).execute()
+
+def get_expenses_by_category(user_id: int, category: str):
+    """recupera il dettaglio delle spese per una singola categoria nel mese corrente."""
+    from datetime import datetime
+    inizio_mese = datetime.now().replace(day=1).strftime("%Y-%m-%d")
+
+    response = supabase.table("transactions") \
+        .select("amount, description, transaction_date") \
+        .eq("user_id", user_id) \
+        .ilike("category", category) \
+        .gte("transaction_date", inizio_mese) \
+        .order("transaction_date", desc=True) \
         .execute()
     
     return response.data
+
+def search_transactions(user_id: int, query: str):
+    """Ricerca espansa su merchant, categoria e descrizione."""
+    from datetime import datetime
+    start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0).isoformat()
+    
+    search_term = f"%{query}%"
+    
+    # Cerchiamo in tutte e tre le colonne testuali
+    response = supabase.table("transactions") \
+        .select("*") \
+        .eq("user_id", user_id) \
+        .gte("created_at", start_of_month) \
+        .or_(f"merchant.ilike.{search_term},category.ilike.{search_term},description.ilike.{search_term}") \
+        .order("created_at", desc=True) \
+        .execute()
+        
+    return response.data
+
+
+def get_monthly_total(user_id: int):
+    """calcola la somma totale spesa dall'utente nel mese corrente."""
+    response = supabase.table("transactions") \
+        .select("amount") \
+        .eq("user_id", user_id) \
+        .execute()
+    
+    return sum(float(item.get('amount', 0)) for item in response.data)
+
+def delete_transaction_by_id(transaction_id: str):
+    """elimina una transazione specifica tramite il suo UUID."""
+    # transaction_id qui deve essere la stringa dell'UUID
+    return supabase.table("transactions").delete().eq("id", transaction_id).execute()
+
+def get_monthly_report_data(user_id: int):
+    """recupera le spese e le raggruppa in modo ultra-sicuro."""
+    from datetime import datetime
+    start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0).isoformat()
+    
+    response = supabase.table("transactions") \
+        .select("category, amount") \
+        .eq("user_id", user_id) \
+        .execute()
+    
+    if not response.data:
+        return []
+
+    report_dict = {}
+    for item in response.data:
+        cat = item.get('category', 'Altro')
+        # FIX: usiamo 'amount' (come visto nel debug) e non 'total_amount' qui!
+        try:
+            amt = float(item.get('amount', 0))
+        except (ValueError, TypeError):
+            amt = 0.0
+            
+        report_dict[cat] = report_dict.get(cat, 0) + amt
+    
+    # qui creiamo la lista per il grafico e il report
+    formatted_data = [
+        {'category': k, 'total_amount': v} 
+        for k, v in report_dict.items()
+    ]
+    return formatted_data
 
 def get_category_total(user_id: int, category: str):
     """Calcola il totale speso in una specifica categoria nel mese corrente."""
@@ -50,9 +144,12 @@ def get_category_total(user_id: int, category: str):
 # --- FUNZIONI DI GESTIONE UTENTE ---
 
 def get_user_settings(user_id: int):
-    """Recupera budget e valuta dell'utente."""
-    response = supabase.table("users_settings").select("*").eq("user_id", user_id).execute()
-    return response.data[0] if response.data else None
+    """assicurati che anche questa usi users_settings."""
+    response = supabase.table("users_settings") \
+        .select("*") \
+        .eq("user_id", user_id) \
+        .execute()
+    return response.data
 
 def create_user_settings(user_id: int, budget: float = 0.0, currency: str = "EUR"):
     """Inizializza un nuovo utente nel sistema."""
@@ -65,16 +162,15 @@ def create_user_settings(user_id: int, budget: float = 0.0, currency: str = "EUR
 
 # --- FUNZIONI DI SCRITTURA TRANSAZIONI E BOLLETTE ---
 
-def add_transaction(user_id: int, amount: float, category: str, merchant: str, source: str = "text"):
-    """Salva una transazione confermata nel database."""
-    data = {
+def add_transaction(user_id, amount, category, merchant=None, description=None):
+    payload = {
         "user_id": user_id,
         "amount": amount,
         "category": category,
         "merchant": merchant,
-        "source": source
+        "description": description # aggiungi questo
     }
-    return supabase.table("transactions").insert(data).execute()
+    return supabase.table("transactions").insert(payload).execute()
 
 def add_bill(user_id: int, name: str, amount: float, due_date: str):
     """Registra una nuova bolletta in scadenza."""
@@ -94,26 +190,60 @@ def update_bill_status(bill_id: str, status: str = "paid"):
 # --- GENERAZIONE GRAFICI ---
 
 def generate_report_chart(transactions):
-    """Genera un grafico a torta basato sulle transazioni fornite."""
-    category_totals = {}
+    """genera il grafico a torta filtrando i dati ed evitando errori nan."""
+    import matplotlib
+    matplotlib.use('Agg') # fondamentale per server e bot
+    import matplotlib.pyplot as plt
+    import io
+
+    # 1. pulizia e conversione dati
+    valid_data = []
     for t in transactions:
-        cat = t['category']
-        category_totals[cat] = category_totals.get(cat, 0) + t['amount']
+        try:
+            # forziamo la conversione in float per sicurezza
+            amount = float(t.get('total_amount', 0))
+            if amount > 0:
+                valid_data.append({
+                    'category': t.get('category', 'Altro'),
+                    'total_amount': amount
+                })
+        except (ValueError, TypeError):
+            continue
 
-    labels = list(category_totals.keys())
-    values = list(category_totals.values())
+    # 2. se non ci sono dati validi, usciamo subito
+    if not valid_data:
+        return None 
+
+    # 3. preparazione liste per il grafico
+    labels = [t['category'] for t in valid_data]
+    values = [t['total_amount'] for t in valid_data]
     
-    # Configurazione estetica del grafico
+    # 4. creazione del grafico
     plt.figure(figsize=(8, 6), facecolor='#f0f0f0')
-    colors = ['#FF5733', '#33FF57', '#3357FF', '#F333FF', '#FFB833']
-    plt.pie(values, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors, shadow=True)
-    plt.title("Spese del Mese per Categoria", fontsize=14, fontweight='bold')
+    colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99','#c2c2f0','#ffb3e6']
+    
+    plt.pie(
+        values, 
+        labels=labels, 
+        autopct='%1.1f%%', 
+        startangle=140, 
+        colors=colors,
+        pctdistance=0.85
+    )
+    
+    # stile donut (ciambella)
+    centre_circle = plt.Circle((0,0), 0.70, fc='#f0f0f0')
+    fig = plt.gcf()
+    fig.gca().add_artist(centre_circle)
 
-    # Salvataggio in buffer di memoria (RAM) per invio immediato via bot
+    plt.title("riepilogo spese mensili", fontsize=14, fontweight='bold')
+    plt.axis('equal') 
+
+    # 5. salvataggio in buffer memoria
     buf = io.BytesIO()
-    plt.savefig(buf, format='png')
+    plt.savefig(buf, format='png', bbox_inches='tight')
     buf.seek(0)
-    plt.close()
+    plt.close() # libera memoria
     return buf
 
 def reset_monthly_data(user_id: int):

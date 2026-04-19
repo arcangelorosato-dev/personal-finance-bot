@@ -15,3 +15,5 @@ venv/
 # file di sistema
 .DS_Store
 Thumbs.db
+
+*.jpg

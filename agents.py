@@ -27,10 +27,11 @@ parser_agent = Agent(
     model=Groq(id="openai/gpt-oss-120b"),
     description="Sei un estrattore di dati puro.",
     instructions=[
-        "Estrai 'amount', 'category', 'merchant', 'is_bill'.",
-        "LOGICA CATEGORIE: Cerca di raggruppare le spese in queste categorie standard: 'Cibo', 'Trasporti', 'Bollette', 'Shopping', 'Svago', 'Altro'.",
-        "Se la spesa non rientra minimamente in queste, crea una nuova categoria specifica (es. 'Salute' o 'Regali').",
-        "Usa sempre l'iniziale maiuscola e il singolare (es. 'Bolletta' e non 'bollette').",
+        "Estrai: 'amount', 'category', 'merchant', 'description', 'is_bill'.",
+        "REGOLE DI ESTRAZIONE:",
+        "- 'description': l'oggetto acquistato (es: 'pizza', 'lavaggio auto', 'calzini').",
+        "- 'merchant': il nome del negozio/posto se presente (es: 'OVS', 'Enel'). Se non c'è, lascia null.",
+        "- 'category': raggruppa in Cibo, Trasporti, Bollette, Shopping, Svago, Altro.",
         "Restituisci SOLO il JSON con virgolette doppie (\")."
     ],
 )
@@ -66,12 +67,11 @@ finance_team = Team(
     members=[parser_agent, analyst_agent, history_agent],
     description="Sei un contabile che produce SOLO JSON validi e commenti brevi.",
    instructions=[
-        "1. Se l'utente ti saluta o fa chiacchiere (es. 'Ciao', 'Come stai'), rispondi gentilmente ma dì che sei qui solo per gestire le finanze.",
-        "2. Se il messaggio è una spesa: coordina i membri per ottenere il commento e il JSON.",
-        "3. Calcola il totale correttamente (es. 2 x 10€ = 20€).",
-        "4. Usa solo le categorie: Cibo, Trasporti, Bollette, Shopping, Altro.",
-        "5. Fondamentale: Restituisci SEMPRE il JSON usando virgolette doppie (\").",
-        "6. Non fare domande all'utente, limita l'output a: Commento + JSON.",
-        "7. Se non è una spesa, non includere alcun JSON."
+        "1. REGOLA D'ORO: Se vedi un numero seguito o preceduto da una parola (es. 10 euro, calzini 5), è SEMPRE una spesa.",
+        "2. Non rispondere MAI 'non ho capito' se nel messaggio è presente una cifra numerica.",
+        "3. Se rilevi una spesa, delega IMMEDIATAMENTE al Contabile (parser_agent) per il JSON e al Consulente per il commento.",
+        "4. Ignora la cortesia: anche se l'utente scrive male, se c'è un prezzo, estrai i dati.",
+        "5. Solo se il messaggio è puramente testuale e privo di cifre (es. 'Ciao', 'Grazie'), rispondi come assistente senza generare JSON.",
+        "6. Produci SEMPRE il JSON con virgolette doppie (\")."
     ],
 )
