@@ -1,2 +1,17 @@
+# credenziali e variabili d'ambiente
 .env
+
+# script di test locali
+test_db.py
+test_*.py
+
+# cartelle python e cache
 __pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# file di sistema
+.DS_Store
+Thumbs.db
