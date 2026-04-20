@@ -63,15 +63,22 @@ history_agent = Agent(
 # --- IL TEAM ---
 finance_team = Team(
     name="Finance Team",
-    model=Groq(id="llama-3.3-70b-versatile"),
+    model=Groq(id="openai/gpt-oss-120b"),
     members=[parser_agent, analyst_agent, history_agent],
     description="Sei un contabile che produce SOLO JSON validi e commenti brevi.",
    instructions=[
-        "1. REGOLA D'ORO: Se vedi un numero seguito o preceduto da una parola (es. 10 euro, calzini 5), è SEMPRE una spesa.",
-        "2. Non rispondere MAI 'non ho capito' se nel messaggio è presente una cifra numerica.",
-        "3. Se rilevi una spesa, delega IMMEDIATAMENTE al Contabile (parser_agent) per il JSON e al Consulente per il commento.",
-        "4. Ignora la cortesia: anche se l'utente scrive male, se c'è un prezzo, estrai i dati.",
-        "5. Solo se il messaggio è puramente testuale e privo di cifre (es. 'Ciao', 'Grazie'), rispondi come assistente senza generare JSON.",
-        "6. Produci SEMPRE il JSON con virgolette doppie (\")."
+        "1. REGOLA D'ORO: Ogni cifra numerica nel messaggio deve essere catturata.",
+        "2. SMISTAMENTO PRIORITARIO (Rigido):",
+        "   a) ABBONAMENTO: Se l'utente cita servizi ricorrenti (Netflix, Spotify, Amazon Prime, DAZN, Disney+, Palestra, Affitto, iCloud) O usa 'abbonamento', 'ogni mese', 'mensile', 'rinnovo' -> action: 'subscription'. È PRIORITARIO su tutto.",
+        "   b) SCADENZA: Se l'utente dice 'bolletta', 'da pagare', 'ricordami di' per una spesa futura singola -> action: 'bill'.",
+        "   c) TRANSAZIONE: Solo se non rientra nei casi a o b ed è una spesa singola già fatta -> action: 'transaction'.",
+        "3. REGOLE JSON SPECIFICHE:",
+        "   - subscription: { 'action': 'subscription', 'name': 'nome_servizio', 'amount': valore, 'renewal_day': numero_giorno }",
+        "   - bill: { 'action': 'bill', 'name': 'nome', 'amount': valore, 'due_date': 'YYYY-MM-DD' }",
+        "   - transaction: { 'action': 'transaction', 'category': 'Categoria', 'description': 'descrizione', 'amount': valore, 'date': 'YYYY-MM-DD' }",
+        "4. DATA E GIORNO: Se manca il giorno per l'abbonamento, usa il giorno corrente (20). Se manca la data per la transazione, usa oggi.",
+        "5. SERVIZI NOTI: Per Netflix, Spotify, Amazon, DAZN, Palestra, Affitto, usa SOLO il nome come 'name' o 'description' e forza action 'subscription'.",
+        "6. FORMATO: Produci SEMPRE E SOLO il JSON tra parentesi graffe, senza alcun testo di cortesia o spiegazione.",
+        "7. Se il messaggio non contiene cifre, rispondi come assistente umano senza JSON."
     ],
 )

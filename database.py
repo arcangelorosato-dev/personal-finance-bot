@@ -14,6 +14,56 @@ supabase: Client = create_client(url, key)
 
 # --- FUNZIONI DI RECUPERO DATI ---
 
+def delete_subscription(sub_id):
+    """elimina un abbonamento ricorrente"""
+    return supabase.table("subscriptions").delete().eq("id", sub_id).execute()
+
+def add_subscription(user_id, name, amount, renewal_day):
+    """registra un nuovo abbonamento ricorrente"""
+    return supabase.table("subscriptions").insert({
+        "user_id": user_id,
+        "name": name.lower().strip(),
+        "amount": amount,
+        "renewal_day": renewal_day
+    }).execute()
+
+def get_user_subscriptions(user_id):
+    # deve puntare alla tabella 'subscriptions' e filtrare per l'utente attuale
+    return supabase.table("subscriptions").select("*").eq("user_id", user_id).execute()
+
+def get_all_pending_bills(user_id):
+    """recupera tutte le scadenze pendenti ordinate per data"""
+    return supabase.table("bills")\
+        .select("*")\
+        .eq("user_id", user_id)\
+        .eq("status", "pending")\
+        .order("due_date", desc=False)\
+        .execute()
+
+def delete_bill(bill_id):
+    """elimina definitivamente una scadenza dal database"""
+    return supabase.table("bills").delete().eq("id", bill_id).execute()
+
+def add_bill(user_id, name, amount, due_date):
+    """inserisce una nuova scadenza nel database"""
+    return supabase.table("bills").insert({
+        "user_id": user_id,
+        "name": name.lower().strip(), # manteniamo il tuo standard minuscolo
+        "amount": amount,
+        "due_date": due_date,
+        "status": "pending"
+    }).execute()
+
+def get_today_bills():
+    """recupera le bollette che scadono oggi e sono ancora pendenti"""
+    from datetime import date
+    today = date.today().isoformat()
+    return supabase.table("bills").select("*").eq("due_date", today).eq("status", "pending").execute()
+
+def mark_bill_as_paid(bill_id):
+    """aggiorna lo stato della bolletta a pagata"""
+    return supabase.table("bills").update({"status": "paid"}).eq("id", bill_id).execute()
+
 def get_existing_categories():
     # recupera tutte le categorie uniche già presenti nel tuo db
     response = supabase.table("transactions").select("category").execute()
@@ -38,7 +88,7 @@ def add_transaction_from_ocr(user_id, amount, category, description, date):
         "amount": amount,
         "category": category_clean,
         "description": description_clean,
-        "date": date
+        "transaction_date": date
     }).execute()
 
 def get_expenses_by_category(user_id: int, category: str):
@@ -74,6 +124,16 @@ def search_transactions(user_id: int, query: str):
         
     return response.data
 
+
+def get_last_transaction_date(user_id):
+    # recupera l'ultima transazione dell'utente per vedere quanto è "vecchia"
+    response = supabase.table("transactions")\
+        .select("transaction_date")\
+        .eq("user_id", user_id)\
+        .order("transaction_date", desc=True)\
+        .limit(1)\
+        .execute()
+    return response.data[0]['transaction_date'] if response.data else None
 
 def get_monthly_total(user_id: int):
     """calcola la somma totale spesa dall'utente nel mese corrente."""
@@ -162,15 +222,20 @@ def create_user_settings(user_id: int, budget: float = 0.0, currency: str = "EUR
 
 # --- FUNZIONI DI SCRITTURA TRANSAZIONI E BOLLETTE ---
 
-def add_transaction(user_id, amount, category, merchant=None, description=None):
-    payload = {
+def add_transaction(user_id, category, description, amount, date=None):
+    # Se la funzione non riceve la data, usiamo oggi
+    if date is None:
+        from datetime import datetime
+        date = datetime.now().strftime("%Y-%m-%d")
+        
+    data = {
         "user_id": user_id,
-        "amount": amount,
         "category": category,
-        "merchant": merchant,
-        "description": description # aggiungi questo
+        "description": description,
+        "amount": amount,
+        "transaction_date": date
     }
-    return supabase.table("transactions").insert(payload).execute()
+    return supabase.table("transactions").insert(data).execute()
 
 def add_bill(user_id: int, name: str, amount: float, due_date: str):
     """Registra una nuova bolletta in scadenza."""

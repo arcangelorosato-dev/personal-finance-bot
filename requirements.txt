@@ -4,3 +4,4 @@ groq
 python-telegram-bot
 agno
 matplotlib
+apscheduler
