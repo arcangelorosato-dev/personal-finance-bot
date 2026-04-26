@@ -160,32 +160,38 @@ async def check_subscriptions_renewal(application: Application):
             continue
 
 
-async def check_bill_reminders(context: ContextTypes.DEFAULT_TYPE):
+async def check_bill_reminders(application):
     from datetime import date
     today = date.today().isoformat()
-
-    # Cerchiamo scadenze odierne o PASSATE ancora non pagate (pending)
-    # .lte significa "Less Than or Equal" (minore o uguale a oggi)
+    
+    # recuperiamo bollette oggi o passate (pending)
     response = supabase.table("bills").select("*").lte("due_date", today).eq("status", "pending").execute()
-
     bills = response.data
-
+    
     if not bills:
         return
-
+        
     for bill in bills:
-        user_id = bill['user_id']
-        text = (
-            f"🔔 **promemoria scadenza!**\\n\\n"
-            f"devi pagare: **{bill['name']}**\\n"
-            f"importo: **{bill['amount']}€**\\n"
-            f"scadenza: {bill['due_date']}\\n\\n"
-            f"usa /scadenze per segnarla come pagata!"
+        # recuperiamo la lingua dell'utente salvata nel DB
+        user_lang = get_user_language(bill['user_id'])
+        
+        # usiamo la chiave 'bill_reminder' dal tuo file strings.py
+        msg = get_text(
+            'bill_reminder', 
+            lang=user_lang, 
+            name=bill['name'], 
+            amount=bill['amount'], 
+            due_date=bill['due_date']
         )
+        
         try:
-            await context.bot.send_message(chat_id=user_id, text=text, parse_mode='Markdown')
+            await application.bot.send_message(
+                chat_id=bill['user_id'],
+                text=msg,
+                parse_mode='Markdown'
+            )
         except Exception as e:
-            print(f"errore nell'invio a {user_id}: {e}")
+            print(f"errore invio reminder a {bill['user_id']}: {e}")
 
 async def inactivity_nudge(application: Application):
     users = get_all_users() # assicurati che questa funzione restituisca anche 'language_code'

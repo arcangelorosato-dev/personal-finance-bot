@@ -3,6 +3,8 @@
 STRINGS = {
     'it': {
         'welcome': "ciao {name}! sono il tuo assistente finanziario. come posso aiutarti oggi?",
+        'bill_reminder': "🔔 **promemoria scadenza!**\n\ndevi pagare: **{name}**\nimporto: **{amount}€**\nscadenza: {due_date}\n\nusa /scadenze per gestirla!",
+        'subscription_renewed': "🔄 **abbonamento rinnovato!**\n\nabbiamo registrato il pagamento di **{amount}€** per **{name}**.",
         'session_expired': "sessione scaduta, riprova.",
         'save_confirm_msg': "✅ **salvato!**\n{amount}€ per {desc}{budget_info}",
         'monthly_spent_label': "💰 speso nel mese: {total}€",
@@ -89,6 +91,8 @@ STRINGS = {
     },
     'en': {
         'welcome': "hello {name}! i am your financial assistant. how can i help you today?",
+        'bill_reminder': "🔔 **bill reminder!**\n\nyou have to pay: **{name}**\namount: **{amount}€**\ndue date: {due_date}\n\nuse /scadenze to manage it!",
+        'subscription_renewed': "🔄 **subscription renewed!**\n\nwe recorded a payment of **{amount}€** for **{name}**.",
         'session_expired': "session expired, please try again.",
         'save_confirm_msg': "✅ **saved!**\n{amount}€ for {desc}{budget_info}",
         'monthly_spent_label': "💰 spent this month: {total}€",
@@ -173,6 +177,8 @@ STRINGS = {
     },
     'es': {
         'welcome': "¡hola {name}! soy tu asistente financiero. ¿cómo puedo ayudarte hoy?",
+        'bill_reminder': "🔔 **¡recordatorio de pago!**\n\ndebes pagar: **{name}**\nimporte: **{amount}€**\nvencimiento: {due_date}\n\n¡usa /scadenze para gestionarlo!",
+        'subscription_renewed': "🔄 **¡suscripción renovada!**\n\nhemos registrado il pago de **{amount}€** por **{name}**.",
         'session_expired': "la sesión ha expirado, inténtalo de nuevo.",
         'save_confirm_msg': "✅ **¡guardado!**\n{amount}€ por {desc}{budget_info}",
         'monthly_spent_label': "💰 gastado este mes: {total}€",
@@ -257,6 +263,8 @@ STRINGS = {
     },
     'fr': {
         'welcome': "salut {name} ! je suis ton assistant financier. comment puis-je t'aider aujourd'hui ?",
+        'bill_reminder': "🔔 **rappel de facture !**\n\nvous devez payer : **{name}**\nmontant : **{amount}€**\néchéance : {due_date}\n\nutilisez /scadenze pour le gérer !",
+        'subscription_renewed': "🔄 **abonnement renouvelé !**\n\nnous avons enregistré le paiement de **{amount}€** pour **{name}**.",
         'session_expired': "session expirée, réessaie.",
         'save_confirm_msg': "✅ **enregistré !**\n{amount}€ pour {desc}{budget_info}",
         'monthly_spent_label': "💰 dépensé ce mois-ci : {total}€",
