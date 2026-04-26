@@ -648,8 +648,7 @@ async def listaspesa_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id
     lang = get_user_language(user_id)
     
-    from database import get_monthly_report_data
-    from datetime import datetime
+    from database import get_monthly_report_data 
     import locale # utile se vuoi nomi mesi automatici, ma strings.py è più sicuro
 
     categories = get_monthly_report_data(user_id)
@@ -1010,8 +1009,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
         bill_id, amount, b_name = parts[2], float(parts[3]), parts[4]
         try:
-            from database import mark_bill_as_paid, add_transaction_from_ocr
-            from datetime import datetime
+            from database import mark_bill_as_paid, add_transaction_from_ocr 
             mark_bill_as_paid(bill_id)
             add_transaction_from_ocr(user_id, amount, "Bollette", b_name, datetime.now().strftime("%Y-%m-%d"))
             await query.edit_message_text(get_text('bill_paid_ok', lang=lang, name=b_name))
@@ -1039,8 +1037,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         back_kb = [[InlineKeyboardButton(get_text('back_btn', lang=lang), callback_data="back_to_list")]]
         await query.edit_message_text(testo, reply_markup=InlineKeyboardMarkup(back_kb), parse_mode='Markdown')
 
-    elif data == "back_to_list":
-        from bot import listaspesa_command
+    elif data == "back_to_list": 
         await listaspesa_command(update, context)
 
     # --- 6. RESET ---
