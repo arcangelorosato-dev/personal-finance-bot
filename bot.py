@@ -55,6 +55,7 @@ async def post_init(application):
     scheduler.add_job(inactivity_nudge, 'cron', hour=18, minute=0, args=[application])
     scheduler.add_job(weekly_summary, 'cron', day_of_week='sun', hour=21, minute=0, args=[application])
     scheduler.add_job(monthly_parasite_report, 'cron', day=1, hour=11, minute=0, args=[application])
+    scheduler.add_job(check_bill_reminders, 'cron', hour=9, minute=0, args=[application])
     
     scheduler.start()
     print("🚀 scheduler avviato correttamente!")
@@ -157,6 +158,34 @@ async def check_subscriptions_renewal(application: Application):
         except Exception as e:
             print(f"errore invio notifica a {s['user_id']}: {e}")
             continue
+
+
+async def check_bill_reminders(context: ContextTypes.DEFAULT_TYPE):
+    from datetime import date
+    today = date.today().isoformat()
+
+    # Cerchiamo scadenze odierne o PASSATE ancora non pagate (pending)
+    # .lte significa "Less Than or Equal" (minore o uguale a oggi)
+    response = supabase.table("bills").select("*").lte("due_date", today).eq("status", "pending").execute()
+
+    bills = response.data
+
+    if not bills:
+        return
+
+    for bill in bills:
+        user_id = bill['user_id']
+        text = (
+            f"🔔 **promemoria scadenza!**\\n\\n"
+            f"devi pagare: **{bill['name']}**\\n"
+            f"importo: **{bill['amount']}€**\\n"
+            f"scadenza: {bill['due_date']}\\n\\n"
+            f"usa /scadenze per segnarla come pagata!"
+        )
+        try:
+            await context.bot.send_message(chat_id=user_id, text=text, parse_mode='Markdown')
+        except Exception as e:
+            print(f"errore nell'invio a {user_id}: {e}")
 
 async def inactivity_nudge(application: Application):
     users = get_all_users() # assicurati che questa funzione restituisca anche 'language_code'
