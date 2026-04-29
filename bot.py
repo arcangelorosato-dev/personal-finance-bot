@@ -162,9 +162,9 @@ async def check_subscriptions_renewal(application: Application):
 
 async def check_bill_reminders(application):
     from datetime import date
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup # Assicurati che siano importati
     today = date.today().isoformat()
     
-    # recuperiamo bollette oggi o passate (pending)
     response = supabase.table("bills").select("*").lte("due_date", today).eq("status", "pending").execute()
     bills = response.data
     
@@ -172,10 +172,24 @@ async def check_bill_reminders(application):
         return
         
     for bill in bills:
-        # recuperiamo la lingua dell'utente salvata nel DB
         user_lang = get_user_language(bill['user_id'])
         
-        # usiamo la chiave 'bill_reminder' dal tuo file strings.py
+        # Creiamo i bottoni dinamici
+        # Il callback_data deve corrispondere a quello che button_handler già gestisce
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    get_text('mark_as_paid_btn', lang=user_lang), 
+                    callback_data=f"pay_bill_{bill['id']}_{bill['amount']}_{bill['name']}"
+                ),
+                InlineKeyboardButton(
+                    get_text('cancel_btn', lang=user_lang), 
+                    callback_data="cancel_bill"
+                )
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         msg = get_text(
             'bill_reminder', 
             lang=user_lang, 
@@ -188,10 +202,11 @@ async def check_bill_reminders(application):
             await application.bot.send_message(
                 chat_id=bill['user_id'],
                 text=msg,
+                reply_markup=reply_markup, # <--- AGGIUNTO IL MARKUP QUI
                 parse_mode='Markdown'
             )
         except Exception as e:
-            print(f"errore invio reminder a {bill['user_id']}: {e}")
+            print(f"errore invio reminder: {e}")
 
 async def inactivity_nudge(application: Application):
     users = get_all_users() # assicurati che questa funzione restituisca anche 'language_code'
